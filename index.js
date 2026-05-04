@@ -7,91 +7,15 @@ const {
 } = require("@whiskeysockets/baileys");
 
 const pino = require('pino');
-const path = require('path');
-
+const fs = require('fs');
 const app = express();
 const PORT = process.env.PORT || 8000;
 
 app.use(express.json());
 
-/* ================= UI ================= */
-app.get('/', (req, res) => {
-  res.send(`
-  <!DOCTYPE html>
-  <html>
-  <head>
-    <title>EMON-BHAI PANEL</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-  </head>
-  <body class="bg-slate-900 text-white flex items-center justify-center min-h-screen">
-
-    <div class="bg-white/5 backdrop-blur-xl border border-white/10 p-8 rounded-2xl text-center w-full max-w-md shadow-xl">
-      
-      <h1 class="text-3xl font-bold text-cyan-400 mb-2">EMON-BHAI</h1>
-      <p class="text-xs text-gray-400 mb-6">WhatsApp Pair System</p>
-
-      <input id="num" placeholder="60123456789"
-        class="w-full p-4 rounded-xl bg-black/40 border border-white/10 text-center text-xl text-cyan-400 mb-4">
-
-      <button onclick="pair()" id="btn"
-        class="w-full bg-cyan-600 hover:bg-cyan-500 p-4 rounded-xl font-bold">
-        GET PAIRING CODE
-      </button>
-
-      <div id="outBox" class="hidden mt-6">
-        <p class="text-xs text-gray-400">Your Code</p>
-        <h2 id="out" class="text-3xl tracking-widest text-cyan-400 mt-2"></h2>
-      </div>
-
-      <div class="mt-8 border-t border-white/10 pt-4 text-sm">
-        <a href="https://facebook.com/facebook.EMon.BHai.FACEBOOK" target="_blank" class="text-blue-400 block">Facebook</a>
-        <a href="https://wa.me/8801309991724" target="_blank" class="text-green-400 block">WhatsApp</a>
-      </div>
-
-    </div>
-
-    <script>
-      async function pair(){
-        let phone = document.getElementById('num').value.replace(/[^0-9]/g,'');
-        if(!phone) return alert('Enter number');
-
-        let btn = document.getElementById('btn');
-        btn.innerText = "LOADING...";
-        btn.disabled = true;
-
-        try{
-          let res = await fetch('/pair',{
-            method:'POST',
-            headers:{'Content-Type':'application/json'},
-            body: JSON.stringify({phone})
-          });
-
-          let data = await res.json();
-
-          if(data.code){
-            document.getElementById('outBox').classList.remove('hidden');
-            document.getElementById('out').innerText = data.code;
-          } else {
-            alert(data.error);
-          }
-
-        }catch(e){
-          alert("Server Error");
-        }
-
-        btn.innerText = "GET PAIRING CODE";
-        btn.disabled = false;
-      }
-    </script>
-
-  </body>
-  </html>
-  `);
-});
-
-/* ================= SOCKET ================= */
 let sock;
 
+/* ================= SOCKET ================= */
 async function startSock() {
   if (sock) return sock;
 
@@ -119,6 +43,51 @@ async function startSock() {
   return sock;
 }
 
+/* ================= UI ================= */
+app.get('/', (req, res) => {
+  res.send(`
+  <html>
+  <body style="font-family:sans-serif;text-align:center;background:#0f172a;color:white">
+    
+    <h1>🔥 EMON-BHAI PANEL 🔥</h1>
+
+    <h3>Pairing Code</h3>
+    <input id="num" placeholder="60123456789"><br>
+    <button onclick="pair()">GET CODE</button>
+    <h2 id="out"></h2>
+
+    <br>
+    <a href="/session" target="_blank" style="color:lime;">📥 Download Session File</a>
+
+    <hr>
+
+    <h3>Contact</h3>
+    <a href="https://facebook.com/facebook.EMon.BHai.FACEBOOK" target="_blank">Facebook</a><br>
+    <a href="https://wa.me/8801309991724" target="_blank">WhatsApp</a>
+
+    <script>
+      async function pair(){
+        let phone = document.getElementById('num').value.replace(/[^0-9]/g,'');
+
+        if(!phone) return alert("Enter number");
+
+        let res = await fetch('/pair',{
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({phone})
+        });
+
+        let data = await res.json();
+
+        document.getElementById('out').innerText = data.code || data.error;
+      }
+    </script>
+
+  </body>
+  </html>
+  `);
+});
+
 /* ================= PAIR ================= */
 app.post('/pair', async (req, res) => {
   try {
@@ -139,6 +108,17 @@ app.post('/pair', async (req, res) => {
     console.log(err);
     res.json({ error: "Pairing failed" });
   }
+});
+
+/* ================= SESSION DOWNLOAD ================= */
+app.get('/session', (req, res) => {
+  const file = './session/creds.json';
+
+  if (!fs.existsSync(file)) {
+    return res.send("❌ Session not found. Connect first.");
+  }
+
+  res.download(file);
 });
 
 /* ================= START ================= */
