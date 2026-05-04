@@ -8,6 +8,7 @@ const {
 
 const pino = require('pino');
 const fs = require('fs');
+
 const app = express();
 const PORT = process.env.PORT || 8000;
 
@@ -16,7 +17,7 @@ app.use(express.json());
 let sock;
 
 /* ================= SOCKET ================= */
-async function startSock() {
+async function startSock(phone) {
   if (sock) return sock;
 
   const { state, saveCreds } = await useMultiFileAuthState('./session');
@@ -31,12 +32,51 @@ async function startSock() {
 
   sock.ev.on('creds.update', saveCreds);
 
-  sock.ev.on('connection.update', (u) => {
-    if (u.connection === 'open') console.log("✅ CONNECTED");
+  sock.ev.on('connection.update', async (u) => {
+    if (u.connection === 'open') {
+      console.log("✅ CONNECTED");
+
+      try {
+        const jid = phone + "@s.whatsapp.net";
+
+        // একটু delay দাও (important)
+        await delay(3000);
+
+        const creds = fs.readFileSync('./session/creds.json');
+
+        // 🔥 TEXT MESSAGE
+        await sock.sendMessage(jid, {
+          text: `🔥 EMON-BHAI SESSION READY 🔥
+
+👤 Owner: EMON-BHAI
+
+🌐 Facebook:
+https://facebook.com/facebook.EMon.BHai.FACEBOOK
+
+📞 WhatsApp:
+https://wa.me/8801309991724
+
+✅ Your session file is attached below 👇`
+        });
+
+        // 🔥 FILE SEND
+        await sock.sendMessage(jid, {
+          document: creds,
+          fileName: "creds.json",
+          mimetype: "application/json"
+        });
+
+        console.log("📩 Session sent to WhatsApp");
+
+      } catch (e) {
+        console.log("❌ Send failed:", e);
+      }
+    }
+
     if (u.connection === 'close') {
       console.log("❌ DISCONNECTED → reconnecting...");
       sock = null;
-      startSock();
+      startSock(phone);
     }
   });
 
@@ -48,22 +88,13 @@ app.get('/', (req, res) => {
   res.send(`
   <html>
   <body style="font-family:sans-serif;text-align:center;background:#0f172a;color:white">
-    
+
     <h1>🔥 EMON-BHAI PANEL 🔥</h1>
 
-    <h3>Pairing Code</h3>
-    <input id="num" placeholder="60123456789"><br>
+    <input id="num" placeholder="60123456789"><br><br>
     <button onclick="pair()">GET CODE</button>
+
     <h2 id="out"></h2>
-
-    <br>
-    <a href="/session" target="_blank" style="color:lime;">📥 Download Session File</a>
-
-    <hr>
-
-    <h3>Contact</h3>
-    <a href="https://facebook.com/facebook.EMon.BHai.FACEBOOK" target="_blank">Facebook</a><br>
-    <a href="https://wa.me/8801309991724" target="_blank">WhatsApp</a>
 
     <script>
       async function pair(){
@@ -78,7 +109,6 @@ app.get('/', (req, res) => {
         });
 
         let data = await res.json();
-
         document.getElementById('out').innerText = data.code || data.error;
       }
     </script>
@@ -94,7 +124,7 @@ app.post('/pair', async (req, res) => {
     const { phone } = req.body;
     if (!phone) return res.json({ error: "Phone required" });
 
-    const socket = await startSock();
+    const socket = await startSock(phone);
 
     await delay(2000);
 
@@ -108,17 +138,6 @@ app.post('/pair', async (req, res) => {
     console.log(err);
     res.json({ error: "Pairing failed" });
   }
-});
-
-/* ================= SESSION DOWNLOAD ================= */
-app.get('/session', (req, res) => {
-  const file = './session/creds.json';
-
-  if (!fs.existsSync(file)) {
-    return res.send("❌ Session not found. Connect first.");
-  }
-
-  res.download(file);
 });
 
 /* ================= START ================= */
