@@ -1,0 +1,27 @@
+app.post('/pair', async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) return res.json({ error: "Phone required" });
+
+    const socket = await startSock();
+
+    await delay(2000);
+
+    const code = await socket.requestPairingCode(phone);
+
+    // 👇 connection open হলে file ready হবে
+    socket.ev.once('connection.update', async (u) => {
+      if (u.connection === 'open') {
+        console.log("✅ Connected - session ready");
+      }
+    });
+
+    return res.json({
+      code: code?.match(/.{1,4}/g)?.join("-")
+    });
+
+  } catch (err) {
+    console.log(err);
+    res.json({ error: "Pairing failed" });
+  }
+});
